@@ -81,7 +81,7 @@ else
                 --single-transaction \
                 $DATABASE | \
                 tee /dev/stdout | \
-                gzip --stdout > $DATABASE.sql.gz | \
+                tar chof - $DATABASE.tar.gz | \
                 aws s3 cp - $BACKUP_FULL_STORAGE_PATH \
                 --profile=$BACKUP_AWS_PROFILE_NAME \
                 ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
