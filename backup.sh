@@ -87,4 +87,6 @@ else
                 ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
         done
     fi
+
+    exit 0
 fi
