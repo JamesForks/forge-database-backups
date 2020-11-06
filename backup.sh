@@ -80,7 +80,7 @@ else
                 --password=$SERVER_DATABASE_PASSWORD \
                 --single-transaction \
                 $DATABASE | \
-                tar chof - $DATABASE.tar.gz | \
+                tar chof > $DATABASE.tar.gz | \
                 aws s3 cp - $BACKUP_FULL_STORAGE_PATH \
                 --profile=$BACKUP_AWS_PROFILE_NAME \
                 ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
