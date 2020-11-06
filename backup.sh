@@ -72,16 +72,20 @@ then
 else
     echo "Using streaming backup mechanism..."
 
+    BACKUP_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+
     if [[ $SERVER_DATABASE_DRIVER == 'mysql' ]]
     then
         for DATABASE in $BACKUP_DATABASES; do
+            BACKUP_ARCHIVE="backup-$BACKUP_ID-$DATABASE.tar.gz"
+
             mysqldump \
                 --user=root \
                 --password=$SERVER_DATABASE_PASSWORD \
                 --single-transaction \
                 $DATABASE | \
                 tar cf - $DATABASE.tar.gz | \
-                aws s3 cp - $BACKUP_FULL_STORAGE_PATH$BACKUP_ARCHIVE \
+                aws s3 cp - "$BACKUP_FULL_STORAGE_PATH$BACKUP_ARCHIVE" \
                 --profile=$BACKUP_AWS_PROFILE_NAME \
                 ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
         done
