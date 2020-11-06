@@ -84,7 +84,8 @@ else
                 --password=$SERVER_DATABASE_PASSWORD \
                 --single-transaction \
                 $DATABASE | \
-                tar cf - $DATABASE.tar.gz | \
+                tar cf - $DATABASE | \
+                gzip -9 > $DATABASE.tar.gz | \
                 aws s3 cp - "$BACKUP_FULL_STORAGE_PATH$BACKUP_TIMESTAMP/$BACKUP_ARCHIVE" \
                 --profile=$BACKUP_AWS_PROFILE_NAME \
                 ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
