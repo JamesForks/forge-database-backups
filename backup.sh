@@ -77,7 +77,7 @@ else
     if [[ $SERVER_DATABASE_DRIVER == 'mysql' ]]
     then
         for DATABASE in $BACKUP_DATABASES; do
-            BACKUP_ARCHIVE="backup-$BACKUP_ID-$DATABASE.tar.gz"
+            BACKUP_ARCHIVE="$DATABASE.tar.gz"
 
             mysqldump \
                 --user=root \
