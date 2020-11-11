@@ -3,6 +3,7 @@
 set -e
 
 BACKUP_STATUS=0
+BACKUP_TIMESTAMP=$(date +%Y%m%d%H%M%S)
 BACKUP_ARCHIVES=()
 
 echo "Starting backup procedure at $SCRIPT_STARTED_AT"
