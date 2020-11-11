@@ -2,94 +2,59 @@
 
 set -e
 
+SCRIPT_STARTED_AT=$(date -u +"%Y-%m-%d %H:%M:%S")
 BACKUP_STATUS=0
+BACKUP_ARCHIVES=()
 
-# Change To Tmp Directory
+echo "Starting backup procedure at $SCRIPT_STARTED_AT"
 
-cd /tmp
+for DATABASE in $BACKUP_DATABASES; do
+    BACKUP_ARCHIVE_NAME="$DATABASE.sql.gz"
+    BACKUP_ARCHIVE_PATH="$BACKUP_FULL_STORAGE_PATH$BACKUP_TIMESTAMP/$BACKUP_ARCHIVE_NAME"
 
-# Make A Temporary Backup Directory
-
-mkdir -p /tmp/forge-backups/$BACKUP_ID
-
-# Run The Correct Backup Script For Each Database Driver
-
-if [[ -z "$BACKUP_SHOULD_STREAM" ]]
-then
-    echo "Using original backup mechanism..."
+    # Dump The Database, GZip And Upload To S3
 
     if [[ $SERVER_DATABASE_DRIVER == 'mysql' ]]
     then
-        for DATABASE in $BACKUP_DATABASES; do
-            mysqldump \
-                --user=root \
-                --password=$SERVER_DATABASE_PASSWORD \
-                --single-transaction \
-                $DATABASE > /tmp/forge-backups/$BACKUP_ID/$DATABASE.sql
-        done
-
-    elif [[ $SERVER_DATABASE_DRIVER == 'pgsql' ]]
-    then
-        for DATABASE in $BACKUP_DATABASES; do
-            sudo -u postgres pg_dump --clean -F p $DATABASE > /tmp/forge-backups/$BACKUP_ID/$DATABASE.sql
-        done
-    fi
-
-    # Add SQL Dump To Archive And Remove It Afterwards
-
-    tar -czvf $BACKUP_ARCHIVE --remove-files -C /tmp/forge-backups/$BACKUP_ID/ .
-
-    # Remove The Temp Directory
-
-    rm -rf /tmp/forge-backups/$BACKUP_ID
-
-    # Upload The Archived File
-
-    if [ -f $BACKUP_ARCHIVE ]
-    then
-        echo "Uploading backup archive..."
-
-        aws s3 cp /tmp/$BACKUP_ARCHIVE $BACKUP_FULL_STORAGE_PATH \
+        mysqldump \
+            --user=root \
+            --password=$SERVER_DATABASE_PASSWORD \
+            --single-transaction \
+            $DATABASE | \
+            gzip -c | \
+            aws s3 cp - $BACKUP_ARCHIVE_PATH \
             --profile=$BACKUP_AWS_PROFILE_NAME \
             ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
-
-        # Set A Failed Status
-
-        if [ $? -ne 0 ]
-        then
-            echo "There was an error uploading the backup archive..."
-            BACKUP_STATUS=1
-        fi
-
-        # Remove Backup Archive
-
-        rm -f $BACKUP_ARCHIVE
     else
-        echo "Backup archive could not be created..."
+        sudo -u postgres pg_dump --clean -F p $DATABASE | \
+        gzip -c | \
+        aws s3 cp - $BACKUP_ARCHIVE_PATH \
+            --profile=$BACKUP_AWS_PROFILE_NAME \
+            ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
     fi
 
-    exit $BACKUP_STATUS
-else
-    echo "Using streaming backup mechanism..."
+    # Get The Size Of This File And Store It
 
-    BACKUP_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+    BACKUP_ARCHIVE_SIZE=$(aws s3 ls $BACKUP_ARCHIVE_PATH \
+        --profile=$BACKUP_AWS_PROFILE_NAME \
+        ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT} | \
+        awk '{print $3}')
 
-    if [[ $SERVER_DATABASE_DRIVER == 'mysql' ]]
-    then
-        for DATABASE in $BACKUP_DATABASES; do
-            BACKUP_ARCHIVE="$DATABASE.sql.gz"
+    BACKUP_ARCHIVES+=($BACKUP_ARCHIVE_NAME $BACKUP_ARCHIVE_SIZE)
+done
 
-            mysqldump \
-                --user=root \
-                --password=$SERVER_DATABASE_PASSWORD \
-                --single-transaction \
-                $DATABASE | \
-                gzip -c | \
-                aws s3 cp - "$BACKUP_FULL_STORAGE_PATH$BACKUP_TIMESTAMP/$BACKUP_ARCHIVE" \
-                --profile=$BACKUP_AWS_PROFILE_NAME \
-                ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
-        done
-    fi
+echo $BACKUP_ARCHIVESBACKUP_ARCHIVES_JSON=$(echo "[$(printf '{\"%s\": %d},' ${BACKUP_ARCHIVES[@]} | sed '$s/,$//')]")
 
-    exit 0
-fi
+curl -s --request POST \
+    --url "$FORGE_PING_CALLBACK" \
+    --data-urlencode "type=backup" \
+    --data-urlencode "backup_token=$BACKUP_TOKEN" \
+    --data-urlencode "streamed=true" \
+    --data-urlencode "status=" \
+    --data-urlencode "backup_configuration_id=$BACKUP_ID" \
+    --data-urlencode "archives=$BACKUP_ARCHIVES_JSON" \
+    --data-urlencode "archive_path=$BACKUP_FULL_STORAGE_PATH$BACKUP_TIMESTAMP" \
+    --data-urlencode "started_at=$SCRIPT_STARTED_AT" \
+    --data-urlencode "uuid=$BACKUP_UUID"
+
+exit 0
