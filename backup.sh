@@ -2,7 +2,6 @@
 
 set -e
 
-SCRIPT_STARTED_AT=$(date -u +"%Y-%m-%d %H:%M:%S")
 BACKUP_STATUS=0
 BACKUP_ARCHIVES=()
 
@@ -26,6 +25,8 @@ for DATABASE in $BACKUP_DATABASES; do
             --profile=$BACKUP_AWS_PROFILE_NAME \
             ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
     else
+        cd /tmp
+
         sudo -u postgres pg_dump --clean -F p $DATABASE | \
         gzip -c | \
         aws s3 cp - $BACKUP_ARCHIVE_PATH \
