@@ -11,6 +11,8 @@ for DATABASE in $BACKUP_DATABASES; do
     BACKUP_ARCHIVE_NAME="$DATABASE.sql.gz"
     BACKUP_ARCHIVE_PATH="$BACKUP_FULL_STORAGE_PATH$BACKUP_TIMESTAMP/$BACKUP_ARCHIVE_NAME"
 
+    echo "Writing backup to $BACKUP_ARCHIVE_PATH"
+
     # Dump The Database, GZip And Upload To S3
 
     if [[ $SERVER_DATABASE_DRIVER == 'mysql' ]]
@@ -24,7 +26,8 @@ for DATABASE in $BACKUP_DATABASES; do
             aws s3 cp - $BACKUP_ARCHIVE_PATH \
             --profile=$BACKUP_AWS_PROFILE_NAME \
             ${BACKUP_AWS_ENDPOINT:+ --endpoint=$BACKUP_AWS_ENDPOINT}
-    else
+    elif [[ $SERVER_DATABASE_DRIVER == 'pgsql' ]]
+    then
         cd /tmp
 
         sudo -u postgres pg_dump --clean -F p $DATABASE | \
@@ -44,7 +47,7 @@ for DATABASE in $BACKUP_DATABASES; do
     BACKUP_ARCHIVES+=($BACKUP_ARCHIVE_NAME $BACKUP_ARCHIVE_SIZE)
 done
 
-echo $BACKUP_ARCHIVESBACKUP_ARCHIVES_JSON=$(echo "[$(printf '{\"%s\": %d},' ${BACKUP_ARCHIVES[@]} | sed '$s/,$//')]")
+$BACKUP_ARCHIVES_JSON=$(echo "[$(printf '{\"%s\": %d},' ${BACKUP_ARCHIVES[@]} | sed '$s/,$//')]")
 
 curl -s --request POST \
     --url "$FORGE_PING_CALLBACK" \
