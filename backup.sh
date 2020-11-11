@@ -32,7 +32,7 @@ for DATABASE in $BACKUP_DATABASES; do
     then
         cd /tmp
 
-        sudo -u postgres pg_dump --clean --create --format p $DATABASE | \
+        sudo -u postgres pg_dump --clean --create -F p $DATABASE | \
         gzip -c | \
         aws s3 cp - $BACKUP_ARCHIVE_PATH \
             --profile=$BACKUP_AWS_PROFILE_NAME \
